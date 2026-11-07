@@ -1,0 +1,8 @@
+{
+  "appId": "com.taller.alimentadoressmd",
+  "appName": "Alimentadores SMD",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}

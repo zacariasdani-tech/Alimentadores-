@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Alimentadores SMD</string>
+    <string name="title_activity_main">Alimentadores SMD</string>
+    <string name="package_name">com.taller.alimentadoressmd</string>
+    <string name="custom_url_scheme">com.taller.alimentadoressmd</string>
+</resources>

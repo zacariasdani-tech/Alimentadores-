@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Alimentadores SMD</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f2f4f7;color:#1b2430}
+header{background:#1F3A5F;color:#fff;padding:12px 16px;font-size:20px;font-weight:bold}
+nav{display:flex;gap:4px;background:#fff;border-bottom:1px solid #c9d1dc;padding:6px 10px;flex-wrap:wrap}
+nav button{border:0;background:none;padding:10px 16px;font-size:15px;cursor:pointer;border-radius:6px}
+nav button.on{background:#1F3A5F;color:#fff}
+main{max-width:900px;margin:14px auto;padding:0 12px}
+.card{background:#fff;border:1px solid #c9d1dc;border-radius:8px;padding:14px;margin-bottom:12px}
+label{display:block;font-weight:bold;margin:10px 0 4px;font-size:14px}
+input{width:100%;padding:12px;font-size:18px;border:2px solid #c9d1dc;border-radius:6px}
+input:focus{border-color:#1F3A5F;outline:0}
+button.b{background:#1F3A5F;color:#fff;border:0;padding:10px 16px;border-radius:6px;font-size:15px;cursor:pointer;margin:6px 6px 0 0}
+button.g{background:#e3e8ef;color:#1b2430}
+.msg{margin-top:10px;padding:10px;border-radius:6px;font-weight:bold}.ok{background:#dff3e4;color:#14592a}.err{background:#fbe0e0;color:#8a1c1c}
+.res{border-left:6px solid #1F3A5F;background:#fff;padding:10px 14px;margin:8px 0;border-radius:6px}
+.big{font-size:26px;font-weight:bold;color:#1F3A5F}
+table{width:100%;border-collapse:collapse;font-size:14px}th{background:#1F3A5F;color:#fff;text-align:left;padding:7px}
+td{padding:6px 7px;border-bottom:1px solid #e3e8ef}td button{border:0;background:#fbe0e0;border-radius:4px;cursor:pointer}
+.kb{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:normal;margin-top:0}.kb input{width:auto}.sc{display:flex;gap:6px}.sc .b{margin:0;padding:0 14px;font-size:20px}#cam{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9;display:flex;align-items:center;justify-content:center}#cam.hide{display:none}.cbox{background:#fff;padding:12px;border-radius:8px;width:94%;max-width:520px}video{width:100%;border-radius:6px;background:#000}#cmsg{margin:8px 0;font-weight:bold}.row{display:flex;gap:8px}.row>div{flex:1}.hide{display:none}small{color:#556}
+</style></head><body>
+<header>Alimentadores SMD · ubicación en estanterías</header>
+<nav><button id="t0" class="on" onclick="tab(0)">Registrar</button><button id="t1" onclick="tab(1)">Consultar</button><button id="t2" onclick="tab(2)">Datos</button><button id="t3" onclick="tab(3)">Etiquetas estantería</button><label class="kb"><input type="checkbox" id="kb" onchange="kbd()"> Sin teclado en pantalla (solo lector)</label></nav>
+<main>
+<section id="p0" class="card">
+<small>Escanea en este orden: alimentador, rollo (código de componente) y estantería-balda (ej. E01-B2). Con Intro del lector se avanza solo y se guarda al leer el tercero. Si el alimentador ya existe, se actualiza su ubicación.</small>
+<label>1. Alimentador</label><div class="sc"><input id="rF" autocomplete="off" autofocus><button class="b" type="button" onclick="scan('rF')">📷</button></div>
+<label>2. Rollo (código de componente)</label><div class="sc"><input id="rR" autocomplete="off"><button class="b" type="button" onclick="scan('rR')">📷</button></div>
+<label>3. Estantería-balda</label><div class="sc"><input id="rS" autocomplete="off" placeholder="E01-B2"><button class="b" type="button" onclick="scan('rS')">📷</button></div>
+<button class="b" onclick="commit()">Guardar</button><button class="b" onclick="scan('rF',true)">📷 Escanear los 3 con cámara</button><button class="b g" onclick="clr()">Limpiar</button>
+<div id="m0"></div></section>
+
+<section id="p1" class="card hide">
+<label>Código de componente</label><div class="sc"><input id="q" autocomplete="off" placeholder="Escanea o escribe el código"><button class="b" type="button" onclick="scan('q')">📷</button></div>
+<div id="out"></div></section>
+
+<section id="p2" class="card hide">
+<input id="flt" placeholder="Filtrar..." oninput="render()">
+<div style="margin:8px 0"><button class="b" onclick="expCSV()">Exportar CSV (Excel)</button>
+<button class="b g" onclick="document.getElementById('imp').click()">Importar CSV</button>
+<input type="file" id="imp" accept=".csv,.txt" class="hide" onchange="impCSV(this)"></div>
+<div id="m2"></div><div style="overflow-x:auto"><table><thead><tr><th>Alimentador</th><th>Rollo</th><th>Estantería</th><th>Balda</th><th>Fecha</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
+<small id="cnt"></small></section>
+
+<section id="p3" class="card hide">
+<small>Genera el listado de etiquetas de estantería en CSV para abrir con P-touch Editor (Brother QL-700) o pegar en el Excel.</small>
+<div class="row"><div><label>Prefijo</label><input id="lp" value="E"></div><div><label>Nº estanterías</label><input id="ls" type="number" min="1" value="6"></div><div><label>Baldas por estantería</label><input id="lb" type="number" min="1" value="5"></div></div>
+<button class="b" onclick="labels()">Descargar CSV de etiquetas</button></section>
+</main>
+<div id="cam" class="hide"><div class="cbox"><video id="vid" playsinline muted></video><div id="cmsg"></div><button class="b" onclick="target=null;stopCam()">Cerrar</button><button id="bf" class="b g" onclick="$('ph').click()">Hacer foto</button><input type="file" id="ph" accept="image/*" capture="environment" class="hide" onchange="photo(this)"></div></div>
+<script>
+const KEY='alimentadoresSMD',$=id=>document.getElementById(id);
+let data=[];try{data=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}};
+const N=v=>v.trim().toUpperCase();
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function tab(n){for(let i=0;i<4;i++){$('p'+i).classList.toggle('hide',i!=n);$('t'+i).classList.toggle('on',i==n)}
+ if(n==0)$('rF').focus();if(n==1)$('q').focus();if(n==2)render()}
+function msg(id,t,c){$(id).innerHTML='<div class="msg '+c+'">'+esc(t)+'</div>'}
+function split(sc){const i=sc.lastIndexOf('-');return i>0?[sc.slice(0,i),sc.slice(i+1)]:[sc,'']}
+function commit(){const f=N($('rF').value),r=N($('rR').value),sc=N($('rS').value);
+ if(!f||!r||!sc){msg('m0','Faltan datos: alimentador, rollo y estantería-balda','err');return}
+ const [s,b]=split(sc),rec={f,r,s,b,t:new Date().toLocaleDateString('es-ES')};
+ const k=data.findIndex(x=>x.f===f);
+ if(k>=0){data[k]=rec;msg('m0','Actualizado: '+f+' → '+s+' '+b,'ok')}else{data.push(rec);msg('m0','Guardado: '+f+' → '+s+' '+b,'ok')}
+ save();['rF','rR','rS'].forEach(i=>$(i).value='');$('rF').focus()}
+function clr(){['rF','rR','rS'].forEach(i=>$(i).value='');$('m0').innerHTML='';$('rF').focus()}
+[['rF','rR'],['rR','rS']].forEach(([a,b])=>$(a).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$(b).focus()}}));
+$('rS').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commit()}});
+function search(){const q=N($('q').value);if(!q){$('out').innerHTML='';return}
+ let r=data.filter(x=>x.r===q);if(!r.length)r=data.filter(x=>x.r.includes(q));
+ $('out').innerHTML=r.length?r.map(x=>'<div class="res"><div class="big">Estantería '+esc(x.s)+(x.b?' · Balda '+esc(x.b):'')+'</div>Rollo: <b>'+esc(x.r)+'</b> · Alimentador: <b>'+esc(x.f)+'</b></div>').join(''):'<div class="msg err">No encontrado: '+esc(q)+'</div>'}
+$('q').addEventListener('keydown',e=>{if(e.key==='Enter'){search();$('q').select()}});
+$('q').addEventListener('input',search);
+function render(){const f=N($('flt').value||'');
+ const rows=data.map((x,i)=>[x,i]).filter(([x])=>!f||(x.f+x.r+x.s+x.b).includes(f));
+ $('tb').innerHTML=rows.map(([x,i])=>'<tr><td>'+esc(x.f)+'</td><td>'+esc(x.r)+'</td><td>'+esc(x.s)+'</td><td>'+esc(x.b)+'</td><td>'+esc(x.t||'')+'</td><td><button onclick="del('+i+')">✕</button></td></tr>').join('');
+ $('cnt').textContent=rows.length+' de '+data.length+' registros'}
+function del(i){if(confirm('¿Eliminar '+data[i].f+'?')){data.splice(i,1);save();render()}}
+function dl(name,txt){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+txt],{type:'text/csv;charset=utf-8'}));a.download=name;a.click()}
+function expCSV(){dl('Alimentadores.csv',['Alimentador;Rollo;Estantería;Balda;Fecha'].concat(data.map(x=>[x.f,x.r,x.s,x.b,x.t||''].join(';'))).join('\r\n'))}
+function impCSV(inp){const fl=inp.files[0];if(!fl)return;const rd=new FileReader();
+ rd.onload=()=>{const lines=rd.result.replace(/^\ufeff/,'').split(/\r?\n/).filter(l=>l.trim());let n=0;
+  lines.forEach((l,i)=>{const c=l.split(l.includes(';')?';':',').map(s=>s.trim().replace(/^"|"$/g,''));
+   if(i==0&&/alimentador/i.test(c[0]))return;if(!c[0]||!c[1])return;
+   const rec={f:N(c[0]),r:N(c[1]),s:N(c[2]||''),b:N(c[3]||''),t:c[4]||''},k=data.findIndex(x=>x.f===rec.f);
+   k>=0?data[k]=rec:data.push(rec);n++});
+  save();render();msg('m2','Importados '+n+' registros','ok');inp.value=''};rd.readAsText(fl)}
+function labels(){const p=$('lp').value.trim()||'E',s=+$('ls').value||1,b=+$('lb').value||1,o=['Codigo;Estanteria;Balda'];
+ for(let i=1;i<=s;i++)for(let j=1;j<=b;j++){const e=p+String(i).padStart(2,'0');o.push(e+'-B'+j+';'+e+';B'+j)}
+ dl('Etiquetas estanteria.csv',o.join('\r\n'))}
+let camFail=false,stream=null,timer=null,target=null,chain=false,det=null;
+const LBL={rF:'alimentador',rR:'rollo',rS:'estantería-balda',q:'código de componente'};
+async function scan(id,ch){
+ if(!('BarcodeDetector' in window)){alert('Este navegador no permite leer códigos con la cámara. Usa Chrome en Android.');return}
+ target=id;chain=!!ch;det=det||new BarcodeDetector();
+ $('cam').classList.remove('hide');$('cmsg').textContent='Apunta al código: '+LBL[id];$('bf').className='b g';if(camFail){failCam();return}
+ try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
+  const v=$('vid');v.srcObject=stream;await v.play();
+  timer=setInterval(async()=>{try{const r=await det.detect(v);if(r.length)got(r[0].rawValue)}catch(e){}},250)}
+ catch(e){failCam(e)}}
+function failCam(e){camFail=true;const c=(!window.isSecureContext||location.protocol==='content:')?' La página está abierta como "'+location.protocol+'", que no permite la cámara en vivo.':'';
+ $('cmsg').textContent='Cámara en vivo no disponible'+(e?' ('+e.name+')':'')+'.'+c+' Pulsa "Hacer foto" y haz la foto del código ('+LBL[target]+').';$('bf').className='b'}
+function stopCam(){clearInterval(timer);timer=null;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('vid').srcObject=null;$('cam').classList.add('hide')}
+function got(val){if(!target)return;const id=target,ch=chain;target=null;stopCam();if(navigator.vibrate)navigator.vibrate(80);
+ $(id).value=val;$(id).dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+ const nx={rF:'rR',rR:'rS'}[id];if(ch&&nx)setTimeout(()=>scan(nx,true),400)}
+async function photo(inp){const f=inp.files[0];if(!f)return;try{const r=await det.detect(await createImageBitmap(f));inp.value='';
+ if(r.length)got(r[0].rawValue);else $('cmsg').textContent='No se detectó ningún código. Prueba otra foto.'}catch(e){$('cmsg').textContent='No se pudo leer la foto'}}
+function kbd(){const off=$('kb').checked;['rF','rR','rS','q'].forEach(i=>$(i).inputMode=off?'none':'text');try{localStorage.setItem('kbOff',off?'1':'')}catch(e){}if(off)$('t0').classList.contains('on')&&$('rF').focus()}
+try{if(localStorage.getItem('kbOff')){$('kb').checked=true;kbd()}}catch(e){}
+</script><script>
+/* Adaptacion para la app Android (Capacitor). En el navegador normal no hace nada. */
+(function(){
+ const C=window.Capacitor;
+ if(!C||!C.isNativePlatform||!C.isNativePlatform())return;
+ const P=C.Plugins||{},BS=P.BarcodeScanner,FS=P.Filesystem,SH=P.Share;
+ const errTxt=e=>String((e&&e.message)||e);
+
+ /* Escaner de camara nativo (ML Kit): el WebView de Android no trae BarcodeDetector */
+ scan=async function(id,ch){
+  if(!BS){alert('El escaner de camara no esta disponible en esta app.');return}
+  try{
+   const av=await BS.isGoogleBarcodeScannerModuleAvailable();
+   if(!av.available){
+    await BS.installGoogleBarcodeScannerModule();
+    alert('Se esta instalando el modulo de escaneo de Google. Espera unos segundos y vuelve a pulsar el boton de camara.');return}
+   const r=await BS.scan({autoZoom:true});
+   const v=r.barcodes&&r.barcodes[0]&&r.barcodes[0].rawValue;
+   if(!v)return;
+   target=id;chain=!!ch;got(v);
+  }catch(e){
+   if(!/cancel/i.test(errTxt(e)))alert('No se pudo usar el escaner de camara: '+errTxt(e));
+  }
+ };
+
+ /* Exportar CSV: en el WebView no funciona la descarga directa; se guarda y se abre el menu Compartir */
+ dl=async function(name,txt){
+  try{
+   await FS.writeFile({path:name,data:'\ufeff'+txt,directory:'CACHE',encoding:'utf8'});
+   const u=await FS.getUri({path:name,directory:'CACHE'});
+   await SH.share({title:name,dialogTitle:name,url:u.uri});
+  }catch(e){
+   if(!/cancel/i.test(errTxt(e)))alert('No se pudo exportar: '+errTxt(e));
+  }
+ };
+})();
+</script>
+</body></html>
