@@ -25,11 +25,11 @@ td{padding:6px 7px;border-bottom:1px solid #e3e8ef}td button{border:0;background
 <nav><button id="t0" class="on" onclick="tab(0)">Registrar</button><button id="t1" onclick="tab(1)">Consultar</button><button id="t2" onclick="tab(2)">Datos</button><button id="t3" onclick="tab(3)">Etiquetas estantería</button><label class="kb"><input type="checkbox" id="kb" onchange="kbd()"> Sin teclado en pantalla (solo lector)</label></nav>
 <main>
 <section id="p0" class="card">
-<small>Escanea en este orden: alimentador, rollo (código de componente) y estantería-balda (ej. E01-B2). Con Intro del lector se avanza solo y se guarda al leer el tercero. Si el alimentador ya existe, se actualiza su ubicación.</small>
-<label>1. Alimentador</label><div class="sc"><input id="rF" autocomplete="off" autofocus><button class="b" type="button" onclick="scan('rF')">📷</button></div>
-<label>2. Rollo (código de componente)</label><div class="sc"><input id="rR" autocomplete="off"><button class="b" type="button" onclick="scan('rR')">📷</button></div>
-<label>3. Estantería-balda</label><div class="sc"><input id="rS" autocomplete="off" placeholder="E01-B2"><button class="b" type="button" onclick="scan('rS')">📷</button></div>
-<button class="b" onclick="commit()">Guardar</button><button class="b" onclick="scan('rF',true)">📷 Escanear los 3 con cámara</button><button class="b g" onclick="clr()">Limpiar</button>
+<small>Escanea en este orden: alimentador (opcional), rollo (código de componente) y estantería-balda (ej. E01-B2). Con Intro del lector se avanza solo y se guarda al leer el tercero. Si el alimentador ya existe, se actualiza su ubicación. Sin alimentador (en blanco o 0000) se actualiza el registro del mismo rollo. Con la cámara, si no hay alimentador, cancela el primer escaneo y pasa directo al rollo.</small>
+<label>1. Alimentador (opcional)</label><div class="sc"><input id="rF" autocomplete="off" autofocus placeholder="opcional"></div>
+<label>2. Rollo (código de componente)</label><div class="sc"><input id="rR" autocomplete="off"></div>
+<label>3. Estantería-balda</label><div class="sc"><input id="rS" autocomplete="off" placeholder="E01-B2"></div>
+<button class="b" onclick="commit()">Guardar</button><button class="b" onclick="scan('rF',true)">📷 Escanear todos con cámara</button><button class="b g" onclick="clr()">Limpiar</button>
 <div id="m0"></div></section>
 
 <section id="p1" class="card hide">
@@ -55,37 +55,40 @@ const KEY='alimentadoresSMD',$=id=>document.getElementById(id);
 let data=[];try{data=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}};
 const N=v=>v.trim().toUpperCase();
+const noF=f=>!f||/^0+$/.test(f);
+const idx=rec=>noF(rec.f)?data.findIndex(x=>noF(x.f)&&x.r===rec.r):data.findIndex(x=>x.f===rec.f);
+const lab=x=>noF(x.f)?'rollo '+x.r:x.f;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function tab(n){for(let i=0;i<4;i++){$('p'+i).classList.toggle('hide',i!=n);$('t'+i).classList.toggle('on',i==n)}
  if(n==0)$('rF').focus();if(n==1)$('q').focus();if(n==2)render()}
 function msg(id,t,c){$(id).innerHTML='<div class="msg '+c+'">'+esc(t)+'</div>'}
 function split(sc){const i=sc.lastIndexOf('-');return i>0?[sc.slice(0,i),sc.slice(i+1)]:[sc,'']}
 function commit(){const f=N($('rF').value),r=N($('rR').value),sc=N($('rS').value);
- if(!f||!r||!sc){msg('m0','Faltan datos: alimentador, rollo y estantería-balda','err');return}
+ if(!r||!sc){msg('m0','Faltan datos: rollo y estantería-balda','err');return}
  const [s,b]=split(sc),rec={f,r,s,b,t:new Date().toLocaleDateString('es-ES')};
- const k=data.findIndex(x=>x.f===f);
- if(k>=0){data[k]=rec;msg('m0','Actualizado: '+f+' → '+s+' '+b,'ok')}else{data.push(rec);msg('m0','Guardado: '+f+' → '+s+' '+b,'ok')}
+ const k=idx(rec);
+ if(k>=0){data[k]=rec;msg('m0','Actualizado: '+lab(rec)+' → '+s+' '+b,'ok')}else{data.push(rec);msg('m0','Guardado: '+lab(rec)+' → '+s+' '+b,'ok')}
  save();['rF','rR','rS'].forEach(i=>$(i).value='');$('rF').focus()}
 function clr(){['rF','rR','rS'].forEach(i=>$(i).value='');$('m0').innerHTML='';$('rF').focus()}
 [['rF','rR'],['rR','rS']].forEach(([a,b])=>$(a).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$(b).focus()}}));
 $('rS').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commit()}});
 function search(){const q=N($('q').value);if(!q){$('out').innerHTML='';return}
  let r=data.filter(x=>x.r===q);if(!r.length)r=data.filter(x=>x.r.includes(q));
- $('out').innerHTML=r.length?r.map(x=>'<div class="res"><div class="big">Estantería '+esc(x.s)+(x.b?' · Balda '+esc(x.b):'')+'</div>Rollo: <b>'+esc(x.r)+'</b> · Alimentador: <b>'+esc(x.f)+'</b></div>').join(''):'<div class="msg err">No encontrado: '+esc(q)+'</div>'}
+ $('out').innerHTML=r.length?r.map(x=>'<div class="res"><div class="big">Estantería '+esc(x.s)+(x.b?' · Balda '+esc(x.b):'')+'</div>Rollo: <b>'+esc(x.r)+'</b>'+(noF(x.f)?'':' · Alimentador: <b>'+esc(x.f)+'</b>')+'</div>').join(''):'<div class="msg err">No encontrado: '+esc(q)+'</div>'}
 $('q').addEventListener('keydown',e=>{if(e.key==='Enter'){search();$('q').select()}});
 $('q').addEventListener('input',search);
 function render(){const f=N($('flt').value||'');
  const rows=data.map((x,i)=>[x,i]).filter(([x])=>!f||(x.f+x.r+x.s+x.b).includes(f));
- $('tb').innerHTML=rows.map(([x,i])=>'<tr><td>'+esc(x.f)+'</td><td>'+esc(x.r)+'</td><td>'+esc(x.s)+'</td><td>'+esc(x.b)+'</td><td>'+esc(x.t||'')+'</td><td><button onclick="del('+i+')">✕</button></td></tr>').join('');
+ $('tb').innerHTML=rows.map(([x,i])=>'<tr><td>'+(x.f?esc(x.f):'—')+'</td><td>'+esc(x.r)+'</td><td>'+esc(x.s)+'</td><td>'+esc(x.b)+'</td><td>'+esc(x.t||'')+'</td><td><button onclick="del('+i+')">✕</button></td></tr>').join('');
  $('cnt').textContent=rows.length+' de '+data.length+' registros'}
-function del(i){if(confirm('¿Eliminar '+data[i].f+'?')){data.splice(i,1);save();render()}}
+function del(i){if(confirm('¿Eliminar '+lab(data[i])+'?')){data.splice(i,1);save();render()}}
 function dl(name,txt){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+txt],{type:'text/csv;charset=utf-8'}));a.download=name;a.click()}
 function expCSV(){dl('Alimentadores.csv',['Alimentador;Rollo;Estantería;Balda;Fecha'].concat(data.map(x=>[x.f,x.r,x.s,x.b,x.t||''].join(';'))).join('\r\n'))}
 function impCSV(inp){const fl=inp.files[0];if(!fl)return;const rd=new FileReader();
  rd.onload=()=>{const lines=rd.result.replace(/^\ufeff/,'').split(/\r?\n/).filter(l=>l.trim());let n=0;
   lines.forEach((l,i)=>{const c=l.split(l.includes(';')?';':',').map(s=>s.trim().replace(/^"|"$/g,''));
-   if(i==0&&/alimentador/i.test(c[0]))return;if(!c[0]||!c[1])return;
-   const rec={f:N(c[0]),r:N(c[1]),s:N(c[2]||''),b:N(c[3]||''),t:c[4]||''},k=data.findIndex(x=>x.f===rec.f);
+   if(i==0&&/alimentador/i.test(c[0]))return;if(!c[1])return;
+   const rec={f:N(c[0]),r:N(c[1]),s:N(c[2]||''),b:N(c[3]||''),t:c[4]||''},k=idx(rec);
    k>=0?data[k]=rec:data.push(rec);n++});
   save();render();msg('m2','Importados '+n+' registros','ok');inp.value=''};rd.readAsText(fl)}
 function labels(){const p=$('lp').value.trim()||'E',s=+$('ls').value||1,b=+$('lb').value||1,o=['Codigo;Estanteria;Balda'];
@@ -132,7 +135,8 @@ try{if(localStorage.getItem('kbOff')){$('kb').checked=true;kbd()}}catch(e){}
    if(!v)return;
    target=id;chain=!!ch;got(v);
   }catch(e){
-   if(!/cancel/i.test(errTxt(e)))alert('No se pudo usar el escaner de camara: '+errTxt(e));
+   if(/cancel/i.test(errTxt(e))){if(ch&&id==='rF')setTimeout(()=>scan('rR',true),300);return}
+   alert('No se pudo usar el escaner de camara: '+errTxt(e));
   }
  };
 
